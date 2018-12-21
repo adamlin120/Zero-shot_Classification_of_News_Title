@@ -10,3 +10,5 @@ model/*
 __pycache__/
 
 *.pdf
+
+.vscode/
