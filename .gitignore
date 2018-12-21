@@ -1,0 +1,12 @@
+# Ignore Bert Model
+bert/
+
+# Ignore data
+data/udn
+
+# Ignore model
+model/*
+
+__pycache__/
+
+*.pdf
