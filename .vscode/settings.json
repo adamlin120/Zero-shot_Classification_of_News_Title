@@ -1,3 +1,8 @@
 {
-    "python.pythonPath": "/home/adam/anaconda3/bin/python"
+    "python.pythonPath": "/home/adam/anaconda3/bin/python",
+    "python.linting.flake8Enabled": false,
+    "python.linting.pylintEnabled": false,
+    "python.linting.pep8Enabled": true,
+    "python.linting.pydocstyleEnabled": false,
+    "python.linting.enabled": true
 }

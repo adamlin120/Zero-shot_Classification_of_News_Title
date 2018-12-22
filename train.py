@@ -40,7 +40,7 @@ val_data_cleaner.tokenize()
 train_data_manager = Data_manager(config, train_data_cleaner.raw_data)
 train_tokens_tensor, train_segments_tensors, train_label = train_data_manager.get_fitting_features_labels()
 val_data_manager = Data_manager(config, val_data_cleaner.raw_data)
-val_tokens_tensor, val_segments_tensors, val_label = train_data_manager.get_fitting_features_labels()
+val_tokens_tensor, val_segments_tensors, val_label = val_data_manager.get_fitting_features_labels()
 
 # Generators
 training_set = Dataset(config, train_tokens_tensor,

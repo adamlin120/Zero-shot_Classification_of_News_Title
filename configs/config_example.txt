@@ -1,6 +1,8 @@
 {
     "model": 'simpleBiLinear',
     "model_save_dir": './model/',
+    "model_for_predict": './model/model_simpleBiLinear_6d134_36883.pt',
+    "type": 'train',
 
     "embed_dim": 1536,
     "hid_dim": 512,
@@ -385,5 +387,8 @@
       '/home/adam/Desktop/irtm/final_project/data/udn/udn201810url_10.json',
       '/home/adam/Desktop/irtm/final_project/data/udn/udn201812url_24.json',
       '/home/adam/Desktop/irtm/final_project/data/udn/udn20184url_12.json'
+   ],
+   "predict_raw_file_list": [
+      '/home/adam/Desktop/irtm/final_project/requests/sample_request.txt'
    ]
 }

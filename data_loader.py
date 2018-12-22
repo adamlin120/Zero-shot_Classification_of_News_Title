@@ -79,10 +79,9 @@ class Data_manager():
             random.shuffle(self.data)
         self.num_article = len(data)
         self.pos_indexed_tokens = []
+        self.neg_indexed_tokens = []
+        self.neg_Y = []
 
-        # self.bert_model = BertModel.from_pretrained(config['bert_model'])
-        # self.BERT_LAYERS = config['BERT_LAYERS']
-        # self.BERT_INTER_LAYER = config['BERT_INTER_LAYER']
 
     # positive example
     def create_positive_idx_tokens(self):
@@ -94,7 +93,6 @@ class Data_manager():
     # negative example
     # should be random each time
     def create_negative_idx_tokens(self):
-        self.neg_indexed_tokens = []
         self.neg_Y = [
             0 for article in self.data for tag_ids in article['tags_ids_trim']]
         for article in self.data:
@@ -110,14 +108,6 @@ class Data_manager():
                 self.neg_indexed_tokens.append(
                     article['title_ids_trim'] + candidate)
 
-    # def extract_bert_feature(self, bert_model, tokens_tensor, segments_tensors):
-    #     bert_model.eval()
-
-    #     # Predict hidden states features for each layer
-    #     encoded_layers, _ = bert_model(tokens_tensor, segments_tensors)
-    #     encoded_layers = encoded_layers[(-self.BERT_LAYERS):]
-
-    #     return encoded_layers
 
     # |DATA| x MAX_LEN x EBD_DIM
     def make_epoch(self):
@@ -127,36 +117,16 @@ class Data_manager():
         self.segments_tensors = torch.tensor([[0]*self.config['MAX_TITLE_LEN'] + [
             1]*self.config['MAX_TAG_LEN'] for _ in range(self.tokens_tensor.shape[0])], dtype=torch.long)
 
-        # self.encoded_layers = self.extract_bert_feature(
-        #     self.bert_model, self.tokens_tensor, self.segments_tensors)
-
-        # self.features = torch.zeros_like(self.encoded_layers[0])
-        # if self.BERT_INTER_LAYER == 'mean':
-        #     for i in range(self.BERT_LAYERS):
-        #         self.features += self.encoded_layers[i]/self.BERT_LAYERS
-        # elif self.BERT_INTER_LAYER == 'concat':
-        #     self.features = torch.cat(self.encoded_layers, 2)
-
-        # # fuse features
-        # if self.config['model']=='simpleBiLinear':
-        #     self.features = torch.mean(self.features, (1))
-
         self.label = torch.tensor(
             self.pos_Y + self.neg_Y, dtype=torch.float).view(-1)
-
-        # # momery release
-        # del self.encoded_layers
-        # gc.collect()
 
 
     def get_fitting_features_labels(self):
         if len(self.pos_indexed_tokens) == 0:
             self.create_positive_idx_tokens()
-        self.create_negative_idx_tokens()
+        if self.config['type']!='predict':
+            self.create_negative_idx_tokens()
         self.make_epoch()
-
-        # self.features = self.features.detach()
-        # return self.features, self.label
 
         return self.tokens_tensor, self.segments_tensors, self.label
 
@@ -171,18 +141,7 @@ class Dataset(data.Dataset):
         self.labels = label.detach()
 
         self.config = config
-    #     self.bert_model = BertModel.from_pretrained(config['bert_model'])
-    #     self.BERT_LAYERS = config['BERT_LAYERS']
-    #     self.BERT_INTER_LAYER = config['BERT_INTER_LAYER']
 
-    # def extract_bert_feature(self, tokens_tensor, segments_tensors):
-    #     self.bert_model.eval()
-
-    #     # Predict hidden states features for each layer
-    #     encoded_layers, _ = self.bert_model(tokens_tensor, segments_tensors)
-    #     encoded_layers = encoded_layers[(-self.BERT_LAYERS):]
-
-    #     return encoded_layers
 
     def __len__(self):
         'Denotes the total number of samples'
@@ -190,22 +149,7 @@ class Dataset(data.Dataset):
 
     def __getitem__(self, index):
         'Generates one sample of data'
-        # # Load data and get label
-        # encoded_layers = self.extract_bert_feature(
-        #     self.tokens[index].view(1, -1), self.seg[index].view(1, -1))
 
-        # X = torch.zeros_like(encoded_layers[0])
-        # if self.BERT_INTER_LAYER == 'mean':
-        #     for i in range(self.BERT_LAYERS):
-        #         X += encoded_layers[i]/self.BERT_LAYERS
-        # elif self.BERT_INTER_LAYER == 'concat':
-        #     X = torch.cat(encoded_layers, 2)
-
-        # # fuse features
-        # if self.config['model'] == 'simpleBiLinear':
-        #     X = torch.mean(X, (1)).squeeze()
-
-        # X = X.detach()
         X = torch.cat((self.tokens[index].view(1, -1), self.seg[index].view(1, -1)), 1)
         y = self.labels[index]
 
