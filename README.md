@@ -26,7 +26,7 @@ User can get the prediction result by sending request to server.
 ### Send Request
 
 ```
-Python3 send_request [--title TITLE] [--tags TAGS [TAGS ...]] [--api_url API_URL]
+python3 send_request [--title TITLE] [--tags TAGS [TAGS ...]] [--api_url API_URL]
 ```
 
 

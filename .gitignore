@@ -1,10 +1,10 @@
-# Ignore Bert Model
+# Ignore Bert Model folder
 bert/
 
-# Ignore data
-data/udn
+# Ignore data folder
+data/
 
-# Ignore model
+# Ignore model folder
 model/*
 
 __pycache__/

@@ -25,7 +25,7 @@ from data_loader import Data_cleaner, Data_manager, Dataset
 SERVER_PORT = 5010
 
 # initialize constants used for server queuing
-IMAGE_QUEUE = "image_queue"
+IMAGE_QUEUE = "text_queue"
 REDIS_PORT = 6379
 BATCH_SIZE = 32
 SERVER_SLEEP = 0.1
@@ -45,6 +45,7 @@ with open('./configs/config_example.txt', 'r') as f:
     config['shuffle'] = False
     config['predict_raw_file_list'] = ['/home/adam/Desktop/irtm/final_project/requests/sample_request.txt']
     # pprint(config)
+
 
 def classify_process(config):
     # load the pre-trained Keras model (here we are using a model
@@ -83,9 +84,8 @@ def classify_process(config):
             # data = q['data']
             data = copy.deepcopy(q)['data']
 
-
             # check to see if the batch list is None
-            if batch==[]:
+            if batch == []:
                 batch = [data]
             # otherwise, stack the data
             else:
@@ -120,7 +120,7 @@ def classify_process(config):
                     # convert to BERT feature
                     local_batch = local_batch.squeeze()
                     tokens_tensor, segments_tensors = local_batch[:, :(
-                        config['MAX_TITLE_LEN']+config['MAX_TAG_LEN'])], local_batch[:, (config['MAX_TITLE_LEN']+config['MAX_TAG_LEN']):]
+                        config['MAX_TITLE_LEN'] + config['MAX_TAG_LEN'])], local_batch[:, (config['MAX_TITLE_LEN'] + config['MAX_TAG_LEN']):]
                     tokens_tensor, segments_tensors = tokens_tensor.to(
                         device), segments_tensors.to(device)
                     bert_model.eval()
@@ -135,7 +135,7 @@ def classify_process(config):
                         local_batch = torch.cat(encoded_layers, 2)
 
                     # fuse features
-                    if config['model'] == 'simpleBiLinear':
+                    if config['model'] == 'simpleBiLinear' and local_batch.size(0)>1:
                         local_batch = torch.cat((torch.mean(local_batch[:, :config['MAX_TITLE_LEN'], :], (1)).squeeze(
                         ), torch.mean(local_batch[:, config['MAX_TITLE_LEN']:, :], (1)).squeeze()), 1)
 
@@ -146,11 +146,10 @@ def classify_process(config):
                     # cal metrics
                     result = np.concatenate([result, y_pred.data.cpu().numpy().reshape((-1,))])
 
-
             ret = {'result': [], 'time': datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
             cur = 0
             for data in batch:
-                ret['result'] += [{'req_id': data['req_id'], 'score': list(result[cur:(cur+data['num_tags'])]), 'title': data['title'], 'tags': data['tags'], 'num_tags': data['num_tags']}]
+                ret['result'] += [{'req_id': data['req_id'], 'score': list(result[cur:(cur + data['num_tags'])]), 'title': data['title'], 'tags': data['tags'], 'num_tags': data['num_tags'], 'MANUAL_DUP': data['MANUAL_DUP']}]
                 cur += data['num_tags']
 
             for (imageID, res) in zip(imageIDs, ret['result']):
@@ -174,14 +173,22 @@ def predict():
 
     # ensure an image was properly uploaded to our endpoint
     if flask.request.method == "POST":
-        jason = flask.request.get_json()
+        jason = flask.request.get_json(force=True)
+        print(jason)
         if jason is not None:
             # {'title': title, 'tags': tags, 'req_id':req_id, 'num_tags': len(tags)}
             jason['data']['tags'] = list(itertools.chain.from_iterable([x.split() for x in jason['data']['tags']]))
             jason['data']['num_tags'] = len(jason['data']['tags'])
 
+            jason['data']['MANUAL_DUP'] = False
+            if jason['data']['num_tags']==1:
+                jason['data']['MANUAL_DUP'] = True
+                jason['data']['num_tags'] = 2
+                jason['data']['tags'] += jason['data']['tags']
+
             print('Incoming Request: ', jason)
-            
+
+
             k = str(uuid.uuid4())
             d = copy.deepcopy(jason)
             d['id'] = k
@@ -200,12 +207,14 @@ def predict():
                     # dictionary so we can return it to the client
                     output = output.decode("utf-8")
                     output = json.loads(output)
+                    if output['MANUAL_DUP'] == True:
+                        output['tags'] = [output['tags'][0]]
+                        output['num_tags'] = 1
                     data["title"] = output['title']
                     data['tags'] = output['tags']
                     data['req_id'] = output['req_id']
                     data['num_tags'] = output['num_tags']
                     data['score'] = output['score']
-                    
 
                     # delete the result from the database and break
                     # from the polling loop

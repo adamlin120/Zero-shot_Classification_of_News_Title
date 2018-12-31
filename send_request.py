@@ -10,7 +10,7 @@ def predict_result(payload_json, api_url):
     r = r.json()
 
     # Ensure the request was successful.
-    if r['req_id']==payload_json['data']['req_id']:
+    if r['req_id'] == payload_json['data']['req_id']:
         return r
     # Otherwise, the request failed.
     else:
@@ -24,9 +24,9 @@ if __name__ == '__main__':
     parser.add_argument('--tags', nargs='+', default='')
     parser.add_argument('--api_url', default='http://140.112.252.117:5010/predict')
     args = parser.parse_args()
-    
+
     # using user defined request
-    if args.title!='' and args.tags!='':
+    if args.title != '' and args.tags != '':
         payload = {'data': {'title': args.title, 'tags': list(map(lambda x: x.strip(), args.tags)), 'req_id': 'IamID'}}
         payload['data']['num_tags'] = len(payload['data']['tags'])
         print("\nUsing User defined payload: {}\n".format(payload))

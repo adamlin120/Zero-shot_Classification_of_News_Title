@@ -1,0 +1,1 @@
+curl http://140.112.252.117:5010/predict -X POST -d '{"data": {"title": "測試測試測試測試測試測試測試測試","tags": ["問", "號號", "Hi"],"req_id": "abcedd","num_tags": 3 }}'  -H "Accept: application/json" -H "Content-type: application/json"

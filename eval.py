@@ -1,4 +1,3 @@
-import apex
 import multiprocessing
 import datetime
 from pytorch_pretrained_bert import BertModel
@@ -30,8 +29,8 @@ with open(config['predict_raw_file_list'][0], 'r', encoding='utf-8') as f:
         req_id = req_id.strip()
         title = title.strip()
         tags = list(map(lambda x: x.strip(), tags.strip().split()))
-        
-        raw_data += [{'title': title, 'tags': tags, 'req_id':req_id, 'num_tags': len(tags)}]
+
+        raw_data += [{'title': title, 'tags': tags, 'req_id': req_id, 'num_tags': len(tags)}]
 
 print(raw_data)
 
@@ -71,7 +70,7 @@ with torch.set_grad_enabled(False):
         # convert to BERT feature
         local_batch = local_batch.squeeze()
         tokens_tensor, segments_tensors = local_batch[:, :(
-            config['MAX_TITLE_LEN']+config['MAX_TAG_LEN'])], local_batch[:, (config['MAX_TITLE_LEN']+config['MAX_TAG_LEN']):]
+            config['MAX_TITLE_LEN'] + config['MAX_TAG_LEN'])], local_batch[:, (config['MAX_TITLE_LEN'] + config['MAX_TAG_LEN']):]
         tokens_tensor, segments_tensors = tokens_tensor.to(
             device), segments_tensors.to(device)
         bert_model.eval()
@@ -101,7 +100,7 @@ print(result)
 ret = {'result': [], 'time': datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
 cur = 0
 for data in raw_data:
-    ret['result'] += [{'req_id': data['req_id'], 'score': list(result[cur:(cur+data['num_tags'])]), 'title': data['title'], 'tags': data['tags'], 'num_tags': data['num_tags']}]
+    ret['result'] += [{'req_id': data['req_id'], 'score': list(result[cur:(cur + data['num_tags'])]), 'title': data['title'], 'tags': data['tags'], 'num_tags': data['num_tags']}]
     cur += data['num_tags']
 
 

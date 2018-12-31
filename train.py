@@ -1,5 +1,4 @@
 from comet_ml import Experiment
-import apex
 import os
 from pytorch_pretrained_bert import BertModel
 import gc
@@ -13,11 +12,11 @@ from torch import nn
 from torch.nn import functional as F
 from torch.utils import data
 from data_loader import Data_cleaner, Data_manager, Dataset
-from net import simpleBiLinear
+from net import simpleBiLinear, attention
 from util import count_parameters, get_config_sha1
 
 # load config
-with open('./configs/config_example.txt', 'r') as f:
+with open('./configs/config_linear.txt', 'r') as f:
     config = literal_eval(f.read())
     config['config_sha1'] = get_config_sha1(config, 5)
     pprint(config)
@@ -54,8 +53,9 @@ val_generator = data.DataLoader(
 # init model, optim, criterion, scheduler
 model = eval(config['model'])(config)
 opt = torch.optim.Adam(model.parameters(), lr=config['lr'])
-scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-    opt, factor=config['lr_sche_factor'], patience=config['lr_sche_patience'], verbose=True)
+#scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+#    opt, factor=config['lr_sche_factor'], patience=config['lr_sche_patience'], verbose=True)
+scheduler = torch.optim.lr_scheduler.StepLR(opt, 3, 0.5)
 criterion = nn.BCELoss()
 print(model)
 print("Number of Trainable Parameters: ", count_parameters(model))
@@ -82,6 +82,7 @@ metric = {'train_loss': [], 'train_accu': [], 'val_loss': [], 'val_accu': []}
 
 # Loop over epochs
 for epoch in trange(config['epochs'], desc='1st loop'):
+    scheduler.step()
     # Training
     with experiment.train():
         model.train()
@@ -90,7 +91,7 @@ for epoch in trange(config['epochs'], desc='1st loop'):
             # convert to BERT feature
             local_batch = local_batch.squeeze()
             tokens_tensor, segments_tensors = local_batch[:, :(
-                config['MAX_TITLE_LEN']+config['MAX_TAG_LEN'])], local_batch[:, (config['MAX_TITLE_LEN']+config['MAX_TAG_LEN']):]
+                config['MAX_TITLE_LEN'] + config['MAX_TAG_LEN'])], local_batch[:, (config['MAX_TITLE_LEN'] + config['MAX_TAG_LEN']):]
             tokens_tensor, segments_tensors = tokens_tensor.to(
                 device), segments_tensors.to(device)
             bert_model.eval()
@@ -111,7 +112,7 @@ for epoch in trange(config['epochs'], desc='1st loop'):
 
             # Transfer to GPU / (CPU)
             local_batch, local_labels = local_batch.to(
-                device), local_labels.to(device)
+                device).squeeze(), local_labels.to(device).squeeze()
 
             # Model computations
             opt.zero_grad()
@@ -126,10 +127,9 @@ for epoch in trange(config['epochs'], desc='1st loop'):
 
             # cal metrics
             y_pred_class = (
-                np.sign(y_pred.clone().detach().cpu().view(-1)-0.5)+1)/2
-            num_corrct = torch.tensor(
-                (local_labels.clone().detach().cpu() == y_pred_class), dtype=torch.float).sum()
-            accu = float(num_corrct) / len(local_labels)
+                np.sign(y_pred.clone().detach().cpu().view(-1) - 0.5) + 1) / 2
+            num_corrct = float((local_labels.clone().detach().cpu() == y_pred_class).to(torch.float).sum())
+            accu = num_corrct / len(local_labels)
             metric['train_loss'].append(loss.item())
             metric['train_accu'].append(accu)
             # Log to Comet.ml
@@ -150,7 +150,7 @@ for epoch in trange(config['epochs'], desc='1st loop'):
                 # convert to BERT feature
                 local_batch = local_batch.squeeze()
                 tokens_tensor, segments_tensors = local_batch[:, :(
-                    config['MAX_TITLE_LEN']+config['MAX_TAG_LEN'])], local_batch[:, (config['MAX_TITLE_LEN']+config['MAX_TAG_LEN']):]
+                    config['MAX_TITLE_LEN'] + config['MAX_TAG_LEN'])], local_batch[:, (config['MAX_TITLE_LEN'] + config['MAX_TAG_LEN']):]
                 tokens_tensor, segments_tensors = tokens_tensor.to(
                     device), segments_tensors.to(device)
                 bert_model.eval()
@@ -159,31 +159,30 @@ for epoch in trange(config['epochs'], desc='1st loop'):
                 local_batch = torch.zeros_like(encoded_layers[0])
                 if BERT_INTER_LAYER == 'mean':
                     for i in range(BERT_LAYERS):
-                        # local_batch += encoded_layers[i]/BERT_LAYERS
                         local_batch += encoded_layers[i]
                 elif BERT_INTER_LAYER == 'concat':
                     local_batch = torch.cat(encoded_layers, 2)
 
-                # fuse features
                 if config['model'] == 'simpleBiLinear':
+                    # fuse features
                     local_batch = torch.cat((torch.mean(local_batch[:, :config['MAX_TITLE_LEN'], :], (1)).squeeze(
                     ), torch.mean(local_batch[:, config['MAX_TITLE_LEN']:, :], (1)).squeeze()), 1)
+                # elif config['model'] == 'lstm':
+                #     #
 
-                # Transfer to GPU
+                # Transfer to GPU / (CPU)
                 local_batch, local_labels = local_batch.to(
-                    device), local_labels.to(device)
+                    device).squeeze(), local_labels.to(device).squeeze()
                 # forward pass
                 y_pred = model(local_batch)
                 # cal metrics
                 loss = criterion(y_pred, local_labels)
                 y_pred_class = (
-                    (np.sign(y_pred.detach().cpu().view(-1)-0.5)+1)/2)
-                num_correct += torch.tensor((local_labels.detach().cpu()
-                                             == y_pred_class), dtype=torch.float).sum()
+                    (np.sign(y_pred.detach().cpu().view(-1) - 0.5) + 1) / 2)
+                num_correct += float((local_labels.detach().cpu() == y_pred_class).to(torch.float).sum())
                 num_pair += len(local_labels)
                 epoch_loss += loss.clone().detach() / len(local_labels)
 
-            scheduler.step(epoch_loss)
 
             if epoch == 0 or epoch_loss < list(sorted(metric['val_loss']))[0]:
                 torch.save(model, os.path.join(
