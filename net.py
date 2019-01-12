@@ -6,7 +6,7 @@ from torch.nn import functional as F
 HID_DIM = 768
 D = HID_DIM
 dropout = 0.1
-Nh = 1 #num heads
+Nh = 4 #num heads
 
 Dk = D // Nh
 Dv = D // Nh
@@ -63,6 +63,7 @@ class attention(nn.Module):
         self.enc_blk = EncoderBlock(conv_num=2, ch_num=D, k=3, length=self.config['MAX_TITLE_LEN'], hid_dim=D)
         self.model_enc_blks = nn.ModuleList([self.enc_blk] * 2)
 
+        self.fc_norm = nn.BatchNorm1d(config['MAX_TITLE_LEN'] * D)
         self.fc_final = nn.Linear(config['MAX_TITLE_LEN'] * D, 1)
 
     # input: [Batch_size, TITLE_LEN + TAG_LEN, EMD_DIM]  eg.[62, 31, 768]
@@ -92,9 +93,12 @@ class attention(nn.Module):
         X = out.transpose(1, 2)
         X = self.resizer(X)
 
-        for enc in self.model_enc_blks: X = enc(X)
+        for enc in self.model_enc_blks:
+            X = enc(X)
 
         X = X.view((X.size(0), -1))
+
+        X = self.fc_norm(X)
         X = self.fc_final(X)
         X = torch.sigmoid(X)
 
@@ -164,6 +168,7 @@ class SelfAttention(nn.Module):
         head = torch.cat(heads, dim=2)
         out = torch.matmul(head, self.Wo)
         return out.transpose(1, 2)
+
 
 class PosEncoder(nn.Module):
     def __init__(self, length):

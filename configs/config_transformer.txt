@@ -1,0 +1,29 @@
+{
+    "model": 'attention',
+    "model_save_dir": './model/',
+    "model_for_predict": './model/model_simpleBiLinear_6d134_36883.pt',
+    "type": 'train',
+    "display_step": 50,
+
+    "embed_dim": 768,
+    "hid_dim": 512,
+    "dropout": 0.5,
+
+    "epochs": 100,
+    "batch_size": 128,
+    "val_batch_size": 256,
+    "lr": 1e-4,   
+    "lr_sche_factor": 0.7,
+    "lr_sche_patience": 1,
+    "shuffle": True,
+    
+    "MAX_TITLE_LEN": 27,
+    "MAX_TAG_LEN": 4,
+
+    "bert_model": 'bert-base-chinese',
+    "BERT_LAYERS": 4,
+    "BERT_INTER_LAYER": 'mean',
+
+    "train_year": ['2011', '2012', '2013', '2014', '2015', '2016', '2017'],
+    "val_year": ['2018'],
+}

@@ -1,7 +1,7 @@
 {
     "model": 'simpleBiLinear',
     "model_save_dir": './model/',
-    "model_for_predict": './model/model_simpleBiLinear_6d134_36883.pt',
+    "model_for_predict": './model/model_simpleBiLinear_e63a6_98560.pt',
     "type": 'train',
 
     "embed_dim": 1536,

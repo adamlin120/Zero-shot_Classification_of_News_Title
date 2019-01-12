@@ -1,5 +1,6 @@
 from comet_ml import Experiment
 import os
+import sys
 from pytorch_pretrained_bert import BertModel
 import gc
 from pprint import pprint
@@ -16,7 +17,7 @@ from net import simpleBiLinear, attention
 from util import count_parameters, get_config_sha1
 
 # load config
-with open('./configs/config_linear.txt', 'r') as f:
+with open(sys.argv[1], 'r') as f:
     config = literal_eval(f.read())
     config['config_sha1'] = get_config_sha1(config, 5)
     pprint(config)
@@ -53,9 +54,7 @@ val_generator = data.DataLoader(
 # init model, optim, criterion, scheduler
 model = eval(config['model'])(config)
 opt = torch.optim.Adam(model.parameters(), lr=config['lr'])
-#scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-#    opt, factor=config['lr_sche_factor'], patience=config['lr_sche_patience'], verbose=True)
-scheduler = torch.optim.lr_scheduler.StepLR(opt, 3, 0.5)
+scheduler = torch.optim.lr_scheduler.StepLR(opt, step_size=config['lr_sche_patience'], gamma=config['lr_sche_factor'])
 criterion = nn.BCELoss()
 print(model)
 print("Number of Trainable Parameters: ", count_parameters(model))
@@ -124,20 +123,20 @@ for epoch in trange(config['epochs'], desc='1st loop'):
             loss.backward()
             # update
             opt.step()
+            if global_step % config['display_step'] == 0:
+                # cal metrics
+                y_pred_class = (
+                    np.sign(y_pred.clone().detach().cpu().view(-1) - 0.5) + 1) / 2
+                num_corrct = float((local_labels.clone().detach().cpu() == y_pred_class).to(torch.float).sum())
+                accu = num_corrct / len(local_labels)
+                metric['train_loss'].append(loss.item())
+                metric['train_accu'].append(accu)
+                # Log to Comet.ml
+                experiment.log_metric("loss", loss.item(), step=global_step)
+                experiment.log_metric("accuracy", accu, step=global_step)
 
-            # cal metrics
-            y_pred_class = (
-                np.sign(y_pred.clone().detach().cpu().view(-1) - 0.5) + 1) / 2
-            num_corrct = float((local_labels.clone().detach().cpu() == y_pred_class).to(torch.float).sum())
-            accu = num_corrct / len(local_labels)
-            metric['train_loss'].append(loss.item())
-            metric['train_accu'].append(accu)
-            # Log to Comet.ml
-            experiment.log_metric("loss", loss.item(), step=global_step)
-            experiment.log_metric("accuracy", accu, step=global_step)
-
-            tqdm.write("\t\tTrain Accuracy: {}\tTrain Loss: {}".format(
-                accu, loss.item()))
+                tqdm.write("\t\tTrain Accuracy: {}\tTrain Loss: {}".format(
+                    accu, loss.item()))
 
     # Validation
     with experiment.test():
